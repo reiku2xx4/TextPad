@@ -299,7 +299,6 @@ public class EditorActivity extends AppCompatActivity {
     void openLastFile() {
         if (!settingsService.getLastFilename().equals(TPStrings.EMPTY)) {
             if (useAndroidManager()) {
-                showToast(formatString(R.string.opened_last_edited_file, settingsService.getLastFilename()));
                 Uri uri = Uri.parse(settingsService.getLastFilename());
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) { //dublicated in useAndroidManager
                     this.openNamedFile(uri);
@@ -307,7 +306,7 @@ public class EditorActivity extends AppCompatActivity {
             } else {
                 this.openNamedFileLegacy(settingsService.getLastFilename());
             }
-
+            showToast(formatString(R.string.opened_last_edited_file, settingsService.getLastFilename()));
         }
     }
 
@@ -494,6 +493,7 @@ public class EditorActivity extends AppCompatActivity {
             intent.setType("*/*");
             intent.putExtra(Intent.EXTRA_MIME_TYPES, mimeTypes);
             intent.putExtra(Intent.EXTRA_TITLE, TPStrings.NEW_FILE_TXT);
+            intent.putExtra("android.content.extra.SHOW_ADVANCED", true);
             startActivityForResult(intent, ACTION_OPTION_FILE);
         } else {
             Intent intent = new Intent(this.getBaseContext(), FileDialog.class);
@@ -568,6 +568,7 @@ public class EditorActivity extends AppCompatActivity {
             intent.setType("*/*");
             intent.putExtra(Intent.EXTRA_MIME_TYPES, mimeTypes);
             intent.putExtra(Intent.EXTRA_TITLE, TPStrings.NEW_FILE_TXT);
+            intent.putExtra("android.content.extra.SHOW_ADVANCED", true);
             startActivityForResult(intent, ACTION_SAVE_FILE);
         } else {
             Intent intent = new Intent(this.getBaseContext(), FileDialog.class);

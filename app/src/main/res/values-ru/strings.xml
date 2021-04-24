@@ -66,5 +66,20 @@
     <string name="Type_Something_Here">Напишите что-нибудь здесь</string>
     <string name="Legacy_file_picker">Старый селектор файлов</string>
     <string name="Use_legacy_file_picker">Использовать устаревшее средство выбора файлов</string>
-	<string name="Dictate">Dictate</string>
+    <string name="Dictate">Dictate</string>
+
+    <string name="tts.waiting_the_command">ожидаю команду</string>
+    <string name="tts.ready_to_dictate">готов к диктовке</string>
+    <string name="tts.dictate">диктовать</string>
+    <string name="tts.done">готово</string>
+    <string name="tts.read_last_sentence">прочитать последнее предложение</string>
+    <string name="tts.go_to_start">перейти в начало</string>
+    <string name="tts.go_to_end">перейти в конец</string>
+    <string name="tts.do_not_understand">не понимаю</string>
+    <string name="tts.read_current_sentence">прочитать текущее предложение</string>
+    <string name="tts.proceed">продолжай</string>
+    <string name="tts.further">дальше</string>
+    <string name="tts.good_bye">пока</string>
+    <string name="tts.unknown_command">неизвестная команда</string>
+    <string name="tts.repeat">повтори</string>
 </resources>
