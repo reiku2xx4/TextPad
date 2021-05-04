@@ -66,8 +66,10 @@
     <string name="Type_Something_Here">Geben Sie hier etwas ein</string>
     <string name="Legacy_file_picker">Legacy-Dateiselektor</string>
     <string name="Use_legacy_file_picker">Verwenden die Legacy-Dateiauswahl</string>
+    <string name="action_edit">Bearbeiten</string>
+    <string name="action_undo">Rückgängig machen</string>
+    <string name="action_redo">Wiederholen</string>
     <string name="Dictate">Dictate</string>
-
     <string name="tts.waiting_the_command">waiting the command</string>
     <string name="tts.ready_to_dictate">ready to dictate</string>
     <string name="tts.dictate">dictate</string>
