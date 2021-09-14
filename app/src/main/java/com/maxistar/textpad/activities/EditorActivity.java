@@ -7,10 +7,11 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
+import java.nio.channels.FileChannel;
 import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
 import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.Activity;
@@ -25,6 +26,7 @@ import android.graphics.Typeface;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.ParcelFileDescriptor;
 import android.text.Editable;
 import android.text.InputType;
 import android.text.Spanned;
@@ -134,7 +136,9 @@ public class EditorActivity extends AppCompatActivity {
                         openNamedFile(u);
                     }
                 } else {
-                    openNamedFileLegacy(u.getPath());
+                    if (u != null) {
+                        openNamedFileLegacy(u.getPath());
+                    }
                 }
             } else { // it this is just created
                 if (this.urlFilename.equals(TPStrings.EMPTY)) {
@@ -294,10 +298,7 @@ public class EditorActivity extends AppCompatActivity {
             return true;
         }
 
-        if (settingsService.isLegacyFilePicker()) {
-            return false;
-        }
-        return true;
+        return !settingsService.isLegacyFilePicker();
     }
 
     void openLastFile() {
@@ -330,6 +331,9 @@ public class EditorActivity extends AppCompatActivity {
 
     String getFilenameByUri(Uri uri) {
         String path = uri.getPath();
+        if (path == null) {
+            return "";
+        }
         String[] paths = path.split("/");
         if (paths.length == 0) {
             return "";
@@ -385,14 +389,12 @@ public class EditorActivity extends AppCompatActivity {
             queryTextListener = new QueryTextListener();
         }
         return queryTextListener;
-    };
+    }
 
-    @Override
-    public boolean onPrepareOptionsMenu(Menu menu) {
+    private void initSearch(MenuItem searchItem) {
         // Set up search view
-        searchItem = menu.findItem(R.id.menu_document_search);
-        SearchView searchView = (SearchView) searchItem.getActionView();
 
+        SearchView searchView = (SearchView) searchItem.getActionView();
         // Set up search view options and listener
         if (searchView != null) {
             searchView.setSubmitButtonEnabled(true);
@@ -401,6 +403,12 @@ public class EditorActivity extends AppCompatActivity {
             searchView.setOnQueryTextListener(getQueryTextListener());
             searchItem.setOnActionExpandListener(getQueryTextListener());
         }
+    }
+
+    @Override
+    public boolean onPrepareOptionsMenu(Menu menu) {
+
+        this.searchItem = menu.findItem(R.id.menu_document_search);
 
         MenuItem undoMenu = menu.findItem(R.id.menu_edit_undo);
         undoMenu.setEnabled(editTextUndoRedo.getCanUndo());
@@ -426,9 +434,16 @@ public class EditorActivity extends AppCompatActivity {
 
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
+        // Close text search
+        if (searchItem != null && searchItem.isActionViewExpanded()) {
+            searchItem.collapseActionView();
+        }
+
         int itemId = item.getItemId();
         if (itemId == R.id.menu_document_open) {
             openFile();
+        } else if (itemId == R.id.menu_document_search) {
+            initSearch(item);
         } else if (itemId == R.id.menu_document_new) {
             newFile();
         } else if (itemId == R.id.menu_dictate) {
@@ -449,10 +464,6 @@ public class EditorActivity extends AppCompatActivity {
             exitApplication();
         }
 
-        // Close text search
-        if (searchItem != null && searchItem.isActionViewExpanded())
-            searchItem.collapseActionView();
-
         return super.onOptionsItemSelected(item);
     }
 
@@ -463,7 +474,7 @@ public class EditorActivity extends AppCompatActivity {
         dictator.startDictation(mText, this, view);
     }
 
-    protected void newFile() {
+    public void newFile() {
         if (changed) {
             new AlertDialog.Builder(this)
                     .setIcon(android.R.drawable.ic_dialog_alert)
@@ -493,12 +504,18 @@ public class EditorActivity extends AppCompatActivity {
         }
     }
 
-    protected void clearFile() {
+    public void clearFile() {
         mText.setText(TPStrings.EMPTY);
-        editTextUndoRedo.clearHistory();
         urlFilename = TPStrings.EMPTY;
+        initEditor();
+        updateTitle();
+    }
+
+    protected void initEditor() {
         changed = false;
-        this.updateTitle();
+        editTextUndoRedo.clearHistory();
+        queryTextListener = null;
+        searchItem = null;
     }
 
     protected void editRedo() {
@@ -665,7 +682,7 @@ public class EditorActivity extends AppCompatActivity {
             fos.write(s.getBytes(settingsService.getFileEncoding()));
             fos.close();
             showToast(R.string.File_Written);
-            changed = false;
+            initEditor();
             updateTitle();
 
             if (next_action == DO_OPEN) {   // because of multithread nature
@@ -690,15 +707,29 @@ public class EditorActivity extends AppCompatActivity {
         }
     }
 
-    protected void saveFile(Uri uri) throws FileNotFoundException, IOException {
+    /**
+     * https://stackoverflow.com/questions/56902845/how-to-properly-overwrite-content-of-file-using-android-storage-access-framework
+     * @param uri File Url
+     * @throws IOException Error Exception
+     */
+    protected void saveFile(Uri uri) throws IOException {
         ContentResolver contentResolver = getContentResolver();
-        OutputStream fos = contentResolver.openOutputStream(uri);
+        ParcelFileDescriptor pfd = contentResolver.openFileDescriptor(uri, "w");
+        if (pfd == null) {
+            throw new IOException();
+        }
+        FileOutputStream fos = new FileOutputStream(pfd.getFileDescriptor());
+        // Use this code to ensure that the file is 'emptied'
+        FileChannel fChan = fos.getChannel();
+        fChan.truncate(0);
+
         String s = this.mText.getText().toString();
 
         s = applyEndings(s);
 
         fos.write(s.getBytes(settingsService.getFileEncoding()));
         fos.close();
+        pfd.close();
     }
 
     protected void saveNamedFile() {
@@ -707,7 +738,7 @@ public class EditorActivity extends AppCompatActivity {
             saveFile(uri);
 
             showToast(R.string.File_Written);
-            changed = false;
+            initEditor();
             updateTitle();
 
             if (next_action == DO_OPEN) {   // because of multithread nature
@@ -751,7 +782,7 @@ public class EditorActivity extends AppCompatActivity {
             editTextUndoRedo.clearHistory();
 
             showToast(getBaseContext().getResources().getString(R.string.File_opened_, filename));
-            changed = false;
+            initEditor();
             this.urlFilename = filename;
             if (!settingsService.getLastFilename().equals(filename)) {
                 settingsService.setLastFilename(filename, this.getApplicationContext());
@@ -770,6 +801,9 @@ public class EditorActivity extends AppCompatActivity {
         try {
             ContentResolver contentResolver = getContentResolver();
             InputStream inputStream = contentResolver.openInputStream(uri);
+            if (inputStream == null) {
+                throw new IOException();
+            }
             int size = inputStream.available();
             DataInputStream dis = new DataInputStream(inputStream);
             byte[] b = new byte[(int) size];
@@ -785,7 +819,7 @@ public class EditorActivity extends AppCompatActivity {
             editTextUndoRedo.clearHistory();
 
             showToast(getBaseContext().getResources().getString(R.string.File_opened_, urlFilename));
-            changed = false;
+            initEditor();
             this.urlFilename = uri.toString();
             if (!settingsService.getLastFilename().equals(urlFilename)) {
                 settingsService.setLastFilename(urlFilename, this.getApplicationContext());
@@ -857,7 +891,6 @@ public class EditorActivity extends AppCompatActivity {
             Uri uri;
             if (data != null) {
                 uri = data.getData();
-                //String path = uri.getPath();
 
                 final int takeFlags = data.getFlags()
                         & (Intent.FLAG_GRANT_READ_URI_PERMISSION
@@ -870,9 +903,8 @@ public class EditorActivity extends AppCompatActivity {
                 }
             }
         } else if (requestCode == ACTION_OPTION_FILE) {
-            Uri uri = null;
             if (data != null) {
-                uri = data.getData();
+                Uri uri = data.getData();
                 urlFilename = uri.toString();
                 this.saveFileWithConfirmation();
             }
@@ -898,11 +930,11 @@ public class EditorActivity extends AppCompatActivity {
     private class QueryTextListener
             implements SearchView.OnQueryTextListener, MenuItem.OnActionExpandListener
     {
-        final private BackgroundColorSpan span = new BackgroundColorSpan(Color.YELLOW);
-        private final Editable editable;
+        private BackgroundColorSpan span = new BackgroundColorSpan(Color.YELLOW);
+        private Editable editable;
         private Matcher matcher;
         private int index;
-        private final int height;
+        private int height;
 
         public QueryTextListener() {
             // Use regex search and spannable for highlighting
